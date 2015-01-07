@@ -28,6 +28,8 @@ from docopt import docopt
 from stormpath.client import Client
 from stormpath.error import Error
 
+from urlparse import urlsplit
+
 
 ##### GLOBALS
 CONFIG_FILE = expanduser('~/.stormy')
@@ -62,6 +64,21 @@ class StormpathExport(object):
             location = getcwd() + '/stormpath-exports'
 
         return location
+
+    def write_csv(self, file, data):
+        """
+        Write JSON data to the specified file.
+
+        This is a simple wrapper around our file handling stuff.
+
+        :param str file: The file to write.
+        :param dict data: The data to write to the file, as a JSON dict.
+        """
+        if not exists(dirname(file)):
+            makedirs(dirname(file))
+
+        with open(file + '.csv', 'w') as file:
+            file.write(data)
 
     def write(self, file, data):
         """
@@ -113,7 +130,7 @@ class StormpathExport(object):
     def export_groups(self):
         """Export all group data for this Stormpath account."""
         print '=== Exporting all group data...'
-
+        csvOrgs = ''
         for directory in self.client.directories:
             for group in directory.groups:
                 print '- Exporting group:', group.name
@@ -127,11 +144,17 @@ class StormpathExport(object):
                     'directory': directory.name,
                     'accounts': [],
                 }
+                parsed = urlsplit(group.href)
+                groupid = parsed.path.replace('/v1/groups/','')
+                csvOrgs += '\n' + groupid + ',' + group.name + ','+ group.description
 
                 for account in group.accounts:
                     json['accounts'].append(account.email)
 
                 self.write('%s/directories/%s/groups/%s' % (self.location, directory.name, group.name), json)
+            print csvOrgs + '-----groups'
+            self.write_csv('%s/directories/%s/groups/groups' % (self.location, directory.name), csvOrgs)
+            csvOrgs = ''
 
         print '=== Done!\n'
 
